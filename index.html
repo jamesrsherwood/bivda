@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safe & Sustainable by Design tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            background-color: #f7f7f7;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        form {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #results {
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Safe and Sustainable by Design tool</h1>
+    <form id="process-form">
+        <label for="temperature">Temperature (°C):</label>
+        <input type="number" step="10" id="temperature" name="temperature" min="20" max="150" required><br><br>
+
+        <label for="time">Time (hours):</label>
+        <input type="number" step="1" id="time" name="time" min="1" max="24" required><br><br>
+
+        <label for="concentrationA">Concentration of Reactant A (mol/L):</label>
+        <input type="number" step="0.1" id="concentrationA" name="concentrationA" min="0.1" max="3" required><br><br>
+
+        <label for="concentrationB">Concentration of Reactant B (mol/L):</label>
+        <input type="number" step="0.1" id="concentrationB" name="concentrationB" min="0.1" max="3" required><br><br>
+
+        <label for="reactorType">Reactor Type:</label>
+        <select id="reactorType" name="reactorType" required>
+            <option value="closed automated process">Closed industrial process, no likelihood of exposure</option>
+            <option value="closed manual process">Synthesis or formulation (closed batch process)</option>
+            <option value="partially open process">Synthesis (batch and other process where opportunity for exposure arises)</option>
+            <option value="open process">Mixing or blending in batch processes (multistage and/or significant contact)</option>
+        </select><br><br>
+
+        <label for="solvent">Solvent:</label>
+        <select id="solvent" name="solvent" required>
+            <option value="">Select Solvent</option>
+        </select><br><br>
+
+        <button type="submit">Model Process</button>
+    </form>
+
+    <div id="results"></div>
+
+    <div class="grid-container">
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const solventData = {
+            '1,2-Dichloroethane': [0.1, 83.6, 1.2455, 2.1, 3.1, '(A) Very high risk', 'Chronic toxicity', 'None', 'Harmful to health', 21, 13, 1303.55699272433, 'No', '?', 0.0029, 'Air', 'Biodegradable', 41.9, 'Yes', 5817, 7.006, 1259.8, 221.6, 98.96, 'Yes', '(B) High risk', 'Long-lived in atmosphere with negative consequences.', '(A) Very high risk', 'n/a', 'n/a', '(A) Very high risk'],
+            'Acetic acid': [0.45, 117.9, 1.0446, 1.1, 1.1, '(C) Medium risk', 'None', 'None', 'Corrosive', 25, 39, 1998.33472106578, 'No', '?', '?', 'Water', 'Readily biodegradable', 26.7, 'No', 5573, 7.212, 1423.5, 210.8, 60.05, 'No', '(C) Medium risk', 'n/a', 'n/a', 'Readily biodegradable in water.', '(D) Low risk', '(D) Low risk'],
+            'Toluene': [0.11, 110.6, 0.866, 1.1, 1.4, '(B) High risk', 'None', 'Suspected chronic toxicity', 'Skin irritation', 192, 4.4, 1693.07575428695, 'No', 226, 56.5, 'Air', 'Readily biodegradable', 2.59, 'Yes', 5490, 6.938, 1334.8, 218.4, 92.14, 'Yes', '(B) High risk', 'VOC with a halflife in the Goldilocks zone.', '(C) Medium risk', 'n/a', 'n/a', '(C) Medium risk'],
+            'Acetone': [0.43, 56.05, 0.79, 1.6, 2.4, '(C) Medium risk', 'None', 'None', 'Eye irritation', 1210, -17, 2134.98622589532, 'No', 62, 200, 'Air and water', 'Readily biodegradable', 14.8, 'No', 5323, 7.126, 1219.4, 231.1, 58.08, 'Yes', '(B) High risk', 'VOC with a halflife in the Goldilocks zone.', '(C) Medium risk', 'Readily biodegradable in water.', '(D) Low risk', '(C) Medium risk'],
+            'Ethylene glycol': [0.52, 197.4, 1.11, 1.1, 1.1, '(B) High risk', 'None', 'Suspected chronic toxicity', 'Harmful to health', 52, 111, 2416.62638956017, 'No', 53, '?', 'Water', 'Readily biodegradable', 0, 'Yes', 5790, 7.557, 1697.7, 165.7, 62.07, 'Yes', '(E) Negligible risk', 'n/a', 'n/a', 'Readily biodegradable in water.', '(D) Low risk', '(D) Low risk'],
+            'Dimethyl sulphoxide': [0.76, 189, 1.1, 2.1, 3.1, '(D) Low risk - no reported hazards', 'None', 'None', 'None', 75, 87, 1958.0240593806, 'No', 178, 56, 'Water', 'Not biodegradable', 0.208333333333333, 'No', 5065, 7.117, 1616.8, 192.6, 78.14, 'No', '(D) Low risk', 'n/a', 'n/a', 'Not biodegradable in water.', '(C) Medium risk (persistent)', '(C) Medium risk'],
+            'n-Hexane': [0, 68.736, 0.66, 1.1, 1.6, '(A) Very high risk', 'Chronic toxicity', 'Suspected chronic toxicity', 'Skin irritation', 72, -22, 2274.30958459039, 'No', 5.3, 16, 'Air', 'Readily biodegradable', 1.96, 'Yes', 4043, 6.864, 1164.6, 223.6, 86.18, 'Yes', '(B) High risk', 'Short-lived in atmosphere - may create smog.', '(B) High risk', 'n/a', 'n/a', '(B) High risk'],
+            'Carbon tetrachloride': [0.1, 76.8, 1.59, 1.1, 2.1, '(A) Very high risk', 'Chronic toxicity', 'Suspected chronic toxicity', 'Harmful to health', 6.4, 'Not flammable', 864.646989988298, 'No', '?', 0.291, 'Air', 'Not biodegradable', 12418.5, 'Yes', 8745, 6.813, 1174.5, 222, 153.82, 'Yes', '(E) Negligible risk', 'Long-lived in atmosphere with negative consequences.', '(A) Very high risk', 'n/a', 'n/a', '(A) Very high risk'],
+            'Ethanol': [0.75, 78.39, 0.789, 1.1, 1.3, '(C) Medium risk', 'None', 'None', 'Eye irritation', 1920, 13, 2431.08313436076, 'No', '?', 114, 'Water', 'Readily biodegradable', 3, 'No', 3771, 7.526, 1285.5, 198.4, 46.07, 'No', '(B) High risk', 'n/a', 'n/a', 'Readily biodegradable in water.', '(D) Low risk', '(D) Low risk'],
+            '4-Methyl-2-pentanone': [0.48, 118, 0.7978, 1.1, 2.1, '(B) High risk', 'None', 'Suspected chronic toxicity', 'Eye irritation', 83, 14, 2116.61341853035, 'No', 4.2, 14.7, 'Air', 'Readily biodegradable', 1.207, 'No', 9141, 6.755, 1217.8, 198.1, 100.16, 'Yes', '(B) High risk', 'Short-lived in atmosphere - may create smog.', '(B) High risk', 'n/a', 'n/a', '(B) High risk'],
+            'Isopropyl acetate': [0.49, 88.6, 0.872, 1.1, 2.1, '(C) Medium risk', 'None', 'None', 'Eye irritation', 275, 5, 1928.91412905121, 'No', 16, 168, 'Air', 'Readily biodegradable', 5, 'No', 7654, 7.141, 1327.2, 222.6, 102.13, 'Yes', '(B) High risk', 'VOC with a halflife in the Goldilocks zone.', '(C) Medium risk', 'n/a', 'n/a', '(C) Medium risk'],
+            'Propylene carbonate': [0.4, 242, 1.189, 1.1, 2.1, '(C) Medium risk', 'None', 'None', 'Eye irritation', 70.53, 116, 1635.81153883828, 'No', 10, 17.4, 'Water', 'Readily biodegradable', 2.824, 'No', 9512, 6.678, 2321.5, 200.5, 102.09, 'No', '(E) Negligible risk', 'n/a', 'n/a', 'Readily biodegradable in water.', '(D) Low risk', '(D) Low risk'],
+            '2-Propanol': [0.84, 82.24, 0.785, 1.1, 1.1, '(C) Medium risk', 'None', 'None', 'Eye irritation', 999, 12, 2562.39600665557, 'No', 319, 89, 'Water', 'Readily biodegradable', 1.472, 'No', 4926, 7.644, 1320.3, 194.8, 60.1, 'Yes', '(B) High risk', 'n/a', 'n/a', 'Readily biodegradable in water.', '(D) Low risk', '(D) Low risk'],
+            'Benzene': [0.1, 80.09, 0.876, 1.1, 1.6, '(A) Very high risk', 'Chronic toxicity', 'Aquatic toxicity', 'Skin and eye irritation', 3.25, -11, 1741.13429778517, 'No', '?', 0.14, 'Air', 'Readily biodegradable', 13.4, 'Yes', 5927, 6.9, 1207.5, 220.4, 78.11, 'Yes', '(B) High risk', 'VOC with a halflife in the Goldilocks zone.', '(C) Medium risk', 'n/a', 'n/a', '(C) Medium risk'],
+            'Tetrahydrofuran': [0.55, 65, 0.883, 1.1, 2.1, '(B) High risk', 'None', 'Suspected chronic toxicity', 'Eye and respiratory irritation', 150, -21.2, 1719.59506309804, 'Yes', 1.5, 13, 'Air and water', 'Biodegradable', 0.758, 'No', 11166, 6.79, 1165.5, 232.2, 72.11, 'Yes', '(B) High risk', 'Short-lived in atmosphere - may create smog.', '(B) High risk', 'Biodegradable in water.', '(D) Low risk', '(B) High risk'],
+            '1,2-Dimethoxyethane': [0.41, 83, 0.87, 1.1, 2.1, '(A) Very high risk', 'Chronic toxicity', 'None', 'Skin irritation', 1.88, -3, 2130.49267643142, 'Yes', 0.09, 0.33, 'Water', 'Not biodegradable', 0.682, 'Yes', 6692, 6.932, 1230.8, 218.3, 90.12, 'Yes', '(B) High risk', 'n/a', 'n/a', 'Not biodegradable in water.', '(C) Medium risk (persistent)', '(C) Medium risk'],
+            'd-Limonene': [0, 176, 0.844, 1.1, 1.6, '(B) High risk', 'None', 'Aquatic toxicity', 'Skin irritation', 66.7, 51, 1830.59307105109, 'No', 4.8, 16.6, 'Air', 'Readily biodegradable', 0.216666666666667, 'Yes', 4642, 7.044, 1597.4, 208.6, 136.24, 'Yes', '(C) Medium risk', 'Short-lived in atmosphere - may create smog.', '(B) High risk', 'n/a', 'n/a', '(B) High risk'],
+            'Trichloroethylene': [0.05, 86.7, 1.465, 2.1, 3.1, '(A) Very high risk', 'Chronic toxicity', 'Suspected chronic toxicity', 'Skin and eye irritation', 550, 'Not flammable', 913.311515336023, 'No', 4.6, 13.7, 'Air', 'Not biodegradable', 13.3, 'Yes', 10988, 7.013, 1305.8, 229, 131.39, 'Yes', '(E) Negligible risk', 'VOC with a halflife in the Goldilocks zone.', '(C) Medium risk', 'n/a', 'n/a', '(C) Medium risk'],
+            '2-Methyltetrahydrofuran': [0.57, 78, 0.855, 1.1, 2.1, '(C) Medium risk', 'None', 'None', 'Harmful to health', 200.196, -10, 1882.0387785905, 'No', '?', '?', 'Air and water', 'Not biodegradable', 0.613, 'No',10260, 6.831, 1178.1, 218, 86.13, 'No', '(B) High risk', 'Short-lived in atmosphere - may create smog.', '(B) High risk', 'Not biodegradable in water.', '(C) Medium risk (persistent)', '(B) High risk'],
+            'Glycerol': [0.51, 290, 1.261, 1.1, 1.1, '(D) Low risk - no reported hazards', 'None', 'None', 'None', 10, 199, 2367.24942990553, 'No', '?', '?', 'Water', 'Readily biodegradable', 0.571, 'No', 8197, 7.599, 2035.5, 141.3, 92.09, 'No', '(E) Negligible risk', 'n/a', 'n/a', 'Readily biodegradable in water.', '(D) Low risk', '(D) Low risk']
+            };
+
+            // Populate the solvent dropdown
+            const solventSelect = document.getElementById('solvent');
+            for (let solvent in solventData) {
+                const option = document.createElement('option');
+                option.value = solvent;
+                option.textContent = solvent;
+                solventSelect.appendChild(option);
+            }
+
+// Handle form submission
+            document.getElementById('process-form').addEventListener('submit', function(event) {
+                event.preventDefault();
+
+                // Get form values
+                const temperature = parseFloat(document.getElementById('temperature').value);
+                const time = document.getElementById('time').value;
+                const concentrationA = document.getElementById('concentrationA').value;
+                const concentrationB = document.getElementById('concentrationB').value;
+                const reactorType = document.getElementById('reactorType').value;
+                const solvent = document.getElementById('solvent').value;
+
+                if (solvent) {
+                    const solventParam = solventData[solvent][0]; // Extract beta
+                    const boilingPoint = solventData[solvent][1]; // Extracting the boiling point
+                    const density = solventData[solvent][2]; //density
+                    const maxconcA = solventData[solvent][3]; // Extracting the max conc of A
+                    const maxconcB = solventData[solvent][4]; // Extracting the max conc of B
+                    const step_one = solventData[solvent][5]; // Extracting SSbD step 1 result
+                    const step_one_groupA = solventData[solvent][6]; 
+                    const step_one_groupB = solventData[solvent][7]; 
+                    const step_one_groupC = solventData[solvent][8]; 
+                    const oel = solventData[solvent][9]; //occupational exposure limit - long term inhalation - professional
+                    const fp = solventData[solvent][10]; 
+                    const heatCap = solventData[solvent][11]; //specific heat capcacity 
+                    const peroxide = solventData[solvent][12]; 
+                    const consumer_dermal = solventData[solvent][13]; 
+                    const consumer_inhalation = solventData[solvent][14]; 
+                    const fate = solventData[solvent][15]; // environmental fate
+                    const biodegradation = solventData[solvent][16]; 
+                    const atmospheric_halflife = solventData[solvent][17]; 
+                    const ecotoxicity = solventData[solvent][18]; 
+                    const energy_solvent = solventData[solvent][19]; //cradle to grave solvent production energy
+                    const antoineA = solventData[solvent][20]; 
+                    const antoineB = solventData[solvent][21]; 
+                    const antoineC = solventData[solvent][22]; 
+                    const RMM = solventData[solvent][23]; 
+                    const InhalationHazard = solventData[solvent][24]; //Y or N for inhalation hazards
+                    const step_two_safety = solventData[solvent][25]; //based on hazard codes
+                    const air_des = solventData[solvent][26]; //air fate description
+                    const step_three_b_air = solventData[solvent][27]; //air conclusion
+                    const water_des = solventData[solvent][28]; //water fate description
+                    const step_three_b_water = solventData[solvent][29]; //water conclusion
+                    const step_three_b_overall = solventData[solvent][30]; //step 3b overall conslusion
+
+
+
+// kinetics
+                const effectiveTemperature = Math.min(temperature, boilingPoint); // Determine effective temperature (capped by bp)
+                const effective_concA = Math.min(maxconcA, concentrationA);
+                const effective_concB = Math.min(maxconcB, concentrationB);
+                const maxconcP = Math.min(effective_concA, effective_concB);
+                
+                let boilingPointMessage = `The boiling point of ${solvent} is ${boilingPoint.toFixed(0)} °C`;
+                if (temperature > boilingPoint) {
+                    boilingPointMessage += ` so the process temperature is restricted to the solvent's boiling point.`;
+                } else {
+                    boilingPointMessage += ` and above the process temperature.`;
+                }
+
+                let concA_Message = `The maximum solubility of A is ${maxconcA} in ${solvent},`;
+                if (concentrationA > maxconcA) {
+                    concA_Message += ` which is less than the chosen concentration.`;
+                } else {
+                    concA_Message += ` so the chosen concentration of A is appropriate.`;
+                }
+
+                let concB_Message = `The maximum solubility of B is ${maxconcB} in ${solvent}.`;
+                if (concentrationB > maxconcB) {
+                    concB_Message += ` which is less than the chosen concentration.`;
+                } else {
+                    concB_Message += ` so the chosen concentration of B is appropriate.`;
+                }
+
+                // Eyring constants
+                const kB = 1.38e-23;  // Boltzmann constant (J/K)
+                const h = 6.626e-34;  // Planck constant (J·s)
+                const R = 8.314;      // Gas constant (J/mol·K)
+
+                // Temperature in Kelvin
+                const T = 273.15 + effectiveTemperature;
+
+                // Calculate ln(k)
+                const term1 = (T * kB / h) * Math.exp(
+                    -(
+                        (1000 * (104 - 63.8 * solventParam)) - 
+                        ((-55.9 - 181 * solventParam) * T)
+                    ) / (R * T)
+                );
+                const lnK = Math.log(term1);
+
+// VTNA calculations
+                const c = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95];
+                const delta_t = c.map(i => (0.05 * maxconcP / Math.exp(lnK)) / (
+                    (((2 * effective_concA) - 0.05 - (0.1 * (i / 5 - 1))) / 2) *
+                    (((2 * effective_concB) - 0.05 - (0.1 * (i / 5 - 1))) / 2)
+                ));
+
+                const t_values = c.map((_, index) => delta_t.slice(0, index + 1).reduce((acc, cur) => acc + cur, 0) / 3600);
+
+                console.log('Time Values:', t_values);
+                console.log('Concentration Values:', c);
+
+                function findClosestTime(time, times) {
+                    let closestTime = times[0];
+                    let minDifference = Math.abs(time - closestTime);
+
+                    for (let i = 1; i < times.length; i++) {
+                        const difference = Math.abs(time - times[i]);
+                        if (difference < minDifference) {
+                            minDifference = difference;
+                            closestTime = times[i];
+                        }
+                    }
+
+                    return closestTime;
+                }
+
+                // Given process time
+                const processTime = time;
+
+                // Finding the closest time
+                const closestTime = findClosestTime(processTime, t_values);
+
+                // Define conversion percentages
+                const conversionPercentages = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95];
+
+                // Find conversion percentage for the closest time
+                const conversionIndex = t_values.indexOf(closestTime);
+                const conversionPercentage = conversionPercentages[conversionIndex] || 'Unknown';
+
+
+
+//energy use
+                Qheat = ((heatCap*1000*density*0.1*(temperature-20))/0.72)*(1/1000000);
+                Qloss = (1.271*0.56*(temperature-20)*3600*time/0.72)*(1/1000000);
+                energy = Qheat + Qloss;
+
+//waste metric (exclude solvent - assume product sold as solution)
+                
+                const RMM_A = 224
+                const RMM_B = 186
+                const volume = 100
+
+                if (concentrationA > concentrationB) {
+                    excess_A = concentrationA - concentrationB;
+                } else {
+                    excess_A = 0;
+                }
+
+                if (concentrationB > concentrationA) {
+                    excess_B = concentrationB - concentrationA;
+                } else {
+                    excess_B = 0;
+                }
+
+                Waste_A = 0.001*RMM_A*volume*((Math.min(concentrationA, concentrationB)*(1-0.01*conversionPercentage)) + excess_A)
+                Waste_B = 0.001*RMM_B*volume*((Math.min(concentrationA, concentrationB)*(1-0.01*conversionPercentage)) + excess_B)
+                Waste_solvent = volume*density
+                Waste = Waste_A + Waste_B //solvent excluded
+
+//Step 1 output                         
+                if (step_one_groupA == "None") {
+                    step_one_hazardA = 0;
+                } else {
+                    step_one_hazardA = step_one_groupA;
+                }
+
+                if (step_one_groupB == "None") {
+                    step_one_hazardB = 0;
+                } else {
+                    step_one_hazardB = step_one_groupB;
+                }
+
+                if (step_one_groupC == "None") {
+                    step_one_hazardC = 0;
+                } else {
+                    step_one_hazardC = step_one_groupC;
+                }
+
+                // Create an array of hazards
+                const hazards = [step_one_hazardA, step_one_hazardB, step_one_hazardC];
+
+                // Filter out hazards that are 0
+                const validHazards = hazards.filter(hazard => hazard !== 0);
+
+                // Join the valid hazards into a single string
+                const hazardsMessage = validHazards.join(', ');
+
+// Step 2 output
+                vp = Math.pow(10, (antoineA - (antoineB / (antoineC + temperature))));
+
+                if (vp < 0.0001) {
+                    fugacity = "Very low";
+                } else if (vp < 5) {
+                    fugacity = "Low";
+                } else if (vp <= 100) {
+                    fugacity = "Medium";
+                } else {
+                    fugacity = "High";
+                }
+
+                // Get the selected reactor type
+                const reactorType = document.getElementById("reactorType").value;
+
+                // Initialize a variable to hold the derived value
+                let exposurerisk = 0;
+
+                // Derive value based on reactorType and fugacity
+                if (reactorType === "closed automated process") {
+                    if (fugacity === "Very low") {
+                        exposurerisk = 0.01;
+                    } else if (fugacity === "Low") {
+                        exposurerisk = 0.01;
+                    } else if (fugacity === "Medium") {
+                        exposurerisk = 0.01;
+                    } else if (fugacity === "High") {
+                        exposurerisk = 0.01;
+                    }
+                } else if (reactorType === "closed manual process") {
+                    if (fugacity === "Very low") {
+                        exposurerisk = 0.1;
+                    } else if (fugacity === "Low") {
+                        exposurerisk = 3;
+                    } else if (fugacity === "Medium") {
+                        exposurerisk = 10;
+                    } else if (fugacity === "High") {
+                        exposurerisk = 50;
+                    }
+                } else if (reactorType === "partially open process") {
+                    if (fugacity === "Very low") {
+                        exposurerisk = 0.1;
+                    } else if (fugacity === "Low") {
+                        exposurerisk = 5;
+                    } else if (fugacity === "Medium") {
+                        exposurerisk = 10;
+                    } else if (fugacity === "High") {
+                        exposurerisk = 100;
+                    }
+                } else if (reactorType === "open process") {
+                    if (fugacity === "Very low") {
+                        exposurerisk = 0.1;
+                    } else if (fugacity === "Low") {
+                        exposurerisk = 5;
+                    } else if (fugacity === "Medium") {
+                        exposurerisk = 10;
+                    } else if (fugacity === "High") {
+                        exposurerisk = 250;
+                    }
+                }
+
+                exposureInhaleProfessional = exposurerisk*(RMM/24)*0.7*0.2 // 8 hr inhalation exposure estimate mg/m^3
+                
+                // Determine the relative professional exposure
+                if (
+                    solvent === "Acetic Acid" ||
+                    solvent === "Dimethyl sulphoxide" ||
+                    solvent === "Ethanol" ||
+                    solvent === "Propylene carbonate" ||
+                    solvent === "2-Methyltetrahydrofuran" ||
+                    solvent === "Glycerol"
+                ) {
+                    relativeProfessionalExposure = "Not relevant - no inhalation hazard";
+                } else {
+                    relativeProfessionalExposure = (exposureInhaleProfessional / oel).toFixed(2);
+                }
+
+                // Assign health risk based on relativeProfessionalExposure
+                if (relativeProfessionalExposure === "Not relevant - no inhalation hazard") {
+                    step_two_health = "(E) Negligible risk";
+                } else if (relativeProfessionalExposure > 1) {
+                    step_two_health = "(A) Very high risk";
+                } else if (relativeProfessionalExposure > 0.75) {
+                    step_two_health = "(B) High risk";
+                } else if (relativeProfessionalExposure > 0.5) {
+                    step_two_health = "(C) Medium risk";
+                } else {
+                    step_two_health = "(D) Low risk";
+                }
+
+                // Determine safety statement
+                if (
+                    solvent === "Tetrahydrofuran" ||
+                    solvent === "1,2-Dimethoxyethane"
+                ) {
+                    safetyStatement = `Peroxide forming solvent with a flashpoint of ${fp} °C`;
+                } else {
+                    safetyStatement = `Flashpoint /°C: ${fp}`;
+                }
+
+                const StepTwoValues = {
+                    "(A) Very high risk": 1,
+                    "(B) High risk": 2,
+                    "(C) Medium risk": 3,
+                    "(D) Low risk": 4,
+                    "(E) Negligible risk": 5
+                };
+
+                // Get numeric values for both assessments
+                let healthRank = StepTwoValues[step_two_health];
+                let safetyRank = StepTwoValues[step_two_safety];
+
+                // Determine the higher-ranked scenario
+                let step_two_overall;
+
+                if (healthRank < safetyRank) {
+                    step_two_overall = step_two_health;
+                } else if (safetyRank < healthRank) {
+                    step_two_overall = step_two_safety;
+                } else {
+                    step_two_overall = step_two_health; // If they are equal, you can choose either
+                }
+
+
+// Step 3a output
+                const inhale_exposure_consumer = 1.059; // mg per m3  
+                const dermal_exposure_consumer = 4.76;  // mg per kg per day                   
+
+                // Determine consumer exposure (by dermal)
+                if (
+                    solvent === "Dimethyl sulphoxide" ||
+                    solvent === "Ethanol" ||
+                    solvent === "Isopropyl acetate" ||
+                    solvent === "Propylene carbonate" ||
+                    solvent === "2-Propanol" ||
+                    solvent === "Glycerol"
+                ) {
+                    relativeConsumerDermalExposure = "Not relevant - no dermal hazard";
+                } else if (
+                    solvent === "1,2-Dichloroethane" ||
+                    solvent === "Acetic acid" ||
+                    solvent === "Carbon tetrachloride" ||
+                    solvent === "Benzene" ||
+                    solvent === "2-Methyltetrahydrofuran"
+                ) {
+                    relativeConsumerDermalExposure = "(A) Very high risk - safe exposure limit not defined";
+                } else {
+                    relativeConsumerDermalExposure = (dermal_exposure_consumer / consumer_dermal).toFixed(2);
+                }
+
+                // Assign health risk based on relativeConsumerDermalExposure
+                if (relativeConsumerDermalExposure === "Not relevant - no dermal hazard") {
+                    step_three_a_dermal = "(E) Negligible risk";
+                } else if (relativeConsumerDermalExposure === "(A) Very high risk - safe exposure limit not defined") {
+                    step_three_a_dermal = "(A) Very high risk";
+                } else if (relativeConsumerDermalExposure > 1) {
+                    step_three_a_dermal = "(A) Very high risk";
+                } else if (relativeConsumerDermalExposure > 0.75) {
+                    step_three_a_dermal = "(B) High risk";
+                } else if (relativeConsumerDermalExposure > 0.5) {
+                    step_three_a_dermal = "(C) Medium risk";
+                } else {
+                    step_three_a_dermal = "(D) Low risk";
+                }
+
+                // Determine consumer exposure (by inhalation)
+                if (
+                    solvent === "Acetic acid" ||
+                    solvent === "Dimethyl sulphoxide" ||
+                    solvent === "Ethanol" ||
+                    solvent === "Propylene carbonate" ||
+                    solvent === "2-Methyltetrahydrofuran" ||
+                    solvent === "Glycerol"
+                ) {
+                    relativeConsumerInhalationExposure = "Not relevant - no inhalation hazard";
+                } else if (
+                    solvent === "Ethylene glycol"
+                ) {
+                    relativeConsumerInhalationExposure = "(A) Very high risk - safe exposure limit not defined";
+                } else {
+                    relativeConsumerInhalationExposure = (inhale_exposure_consumer / consumer_inhalation).toFixed(2);
+                }
+
+                // Assign health risk based on relativeConsumerInhalationExposure
+                if (relativeConsumerInhalationExposure === "Not relevant - no inhalation hazard") {
+                    step_three_a_inhale = "(E) Negligible risk";
+                } else if (relativeConsumerInhalationExposure === "(A) Very high risk - safe exposure limit not defined") {
+                    step_three_a_inhale = "(A) Very high risk";
+                } else if (relativeConsumerInhalationExposure > 1) {
+                    step_three_a_inhale = "(A) Very high risk";
+                } else if (relativeConsumerInhalationExposure > 0.75) {
+                    step_three_a_inhale = "(B) High risk";
+                } else if (relativeConsumerInhalationExposure > 0.5) {
+                    step_three_a_inhale = "(C) Medium risk";
+                } else {
+                    step_three_a_inhale = "(D) Low risk";
+                }
+
+
+                if (
+                    solvent === "1,2-Dichloroethane" ||
+                    solvent === "Carbon tetrachloride" ||
+                    solvent === "Benzene" ||
+                    solvent === "1,2-Dimethoxyethane" ||
+                    solvent === "Trichloroethylene"
+                ) {
+                    step_three_a_warning = "Banned for consumer use.";
+                } else if (
+                    solvent === "Toluene"
+                ) {
+                    step_three_a_warning = "REACH Restriction: Shall not be placed on the market, or used, as a substance or in mixtures in a concentration equal to or greater than 0,1 % by weight where the substance or mixture is used in adhesives or spray paints intended for supply to the general public.";
+                } else {
+                    step_three_a_warning = "";
+                }
+
+                const StepThree_a_Values = {
+                    "(A) Very high risk": 1,
+                    "(B) High risk": 2,
+                    "(C) Medium risk": 3,
+                    "(D) Low risk": 4,
+                    "(E) Negligible risk": 5
+                };
+
+                // Get numeric values for both assessments
+                let consumer_dermal_Rank = StepThree_a_Values[step_three_a_dermal];
+                let consumer_inhale_Rank = StepThree_a_Values[step_three_a_inhale];
+
+                // Determine the higher-ranked scenario
+                let step_three_a_overall;
+
+                if (consumer_dermal_Rank < consumer_inhale_Rank) {
+                    step_three_a_overall = step_three_a_dermal;
+                } else if (consumer_inhale_Rank < consumer_dermal_Rank) {
+                    step_three_a_overall = step_three_a_inhale;
+                } else {
+                    step_three_a_overall = step_three_a_dermal; // If they are equal, you can choose either
+                }
+
+//step 3b output
+
+                // Environmental fate
+                if (
+                    solvent === "1,2-Dichloroethane" ||
+                    solvent === "Toluene" ||
+                    solvent === "n-Hexane" ||
+                    solvent === "Carbon tetrachloride" ||
+                    solvent === "Benzene" ||
+                    solvent === "Isopropyl acetate" ||
+                    solvent === "4-Methyl-2-pentanone" ||
+                    solvent === "d-Limonene" ||
+                    solvent === "Trichloroethylene"
+                ) {
+                    Environmental_fate_description = air_des;
+                } else if (
+                    solvent === "Acetic acid" ||
+                    solvent === "Ethylene glycol" ||
+                    solvent === "Dimethyl sulphoxide" ||
+                    solvent === "Ethanol" ||
+                    solvent === "Propylene carbonate" ||
+                    solvent === "2-Propanol" ||
+                    solvent === "1,2-Dimethoxyethane" ||
+                    solvent === "Glycerol"
+                ) {
+                    Environmental_fate_description = water_des;
+                } else {
+                    Environmental_fate_description = air_des + " " + water_des;
+                }
+
+
+// Step 4
+
+                //Impact estimate
+                energy_reactantA = 140 * volume * concentrationA * RMM_A * 0.001 //per kg x mass
+                energy_reactantB = 225 * volume * concentrationB * RMM_B * 0.001 //per kg x mass
+                total_impact = (energy_reactantA + energy_reactantB + energy_solvent + energy)*0.056 -1.77
+                service = volume * conversionPercentage*0.01
+                demand = 330000
+                SoSOS = 10900000
+                PwES = (total_impact/SoSOS)/(service/demand)
+                PwES_percentage = PwES*100
+
+                if (PwES > 1) {
+                    step_four = "(A) Very high risk";
+                } else if (PwES > 0.75) {
+                    step_four = "(B) High risk";
+                } else if (PwES > 0.50) {
+                    step_four = "(C) Medium risk";
+                } else {
+                    step_four = "(D) Low risk";
+                }
+
+
+//text output
+                // Define colors for each risk level
+                const riskColors = {
+                    "(A) Very high risk": "rgb(190, 0, 0)",
+                    "(B) High risk": "rgb(250, 0, 0)",
+                    "(C) Medium risk": "rgb(230, 90, 25)",
+                    "(D) Low risk": "rgb(250, 170, 130)",
+                    "(E) Negligible risk": "rgb(60, 125, 30)"
+                };
+
+                // Function to color-code risk phrases
+                function getColorCodedRisk(riskLevel) {
+                    const color = riskColors[riskLevel] || "black";
+                    return `<span style="color: ${color}; font-weight: bold;">${riskLevel}</span>`;
+                }
+
+                // Your existing code with modifications to apply the color-coding
+                const resultMessage = `
+                    <strong>Practical considerations:</strong>
+                    <br>${boilingPointMessage}
+                    <br>${concA_Message}
+                    <br>${concB_Message}
+                    <br>
+                    <br><strong>Process (re)design:</strong>
+                    <br>Conversion efficiency is <strong>${conversionPercentage}%</strong>
+                    <br>Energy use is <strong>${energy.toFixed(0)} MJ</strong>.
+                    <br>The mass of waste is <strong>${Waste.toFixed(0)} kg</strong>.
+                    <br>
+                    <br><strong>Safety and Sustainability Assessment - Step 1:</strong>
+                    <br>Solvent is considered ${getColorCodedRisk(step_one)} due to these hazards: <em>${hazardsMessage}</em>.
+                    <br>
+                    <br><strong>Safety and Sustainability Assessment - Step 2:</strong>
+                    <br>Exposure (inhalation) relative to occupational exposure limit is <strong>${relativeProfessionalExposure}</strong>.
+                    <br>Step 2 (health) rank is ${getColorCodedRisk(step_two_health)}.
+                    <br>------------------------------
+                    <br>${safetyStatement}
+                    <br>Step 2 (safety) rank is ${getColorCodedRisk(step_two_safety)}.
+                    <br>
+                    <br><strong>Safety and Sustainability Assessment - Step 3:</strong> <span style="color: red;">${step_three_a_warning}</span>
+                    <br>Dermal exposure to consumers relative to recommended exposure limit is <strong>${relativeConsumerDermalExposure}</strong>.
+                    <br>Step 3 dermal: ${getColorCodedRisk(step_three_a_dermal)}.
+                    <br>Inhalation exposure to consumers relative to recommended exposure limit is <strong>${relativeConsumerInhalationExposure}</strong>. 
+                    <br>Step 3 inhalation: ${getColorCodedRisk(step_three_a_inhale)}. 
+                    <br>------------------------------
+                    <br>Environmental fate: <em>${Environmental_fate_description}</em>
+                    <br>Step 3 environment is ${getColorCodedRisk(step_three_b_overall)}.
+                    <br>
+                    <br><strong>Safety and Sustainability Assessment - Step 4:</strong>
+                    <br>Step 4 climate change impact is <strong>${total_impact.toFixed(0)} kg CO<sub>2</sub></strong> (cradle to gate per 100 L).
+                    <br>PwES of <strong>${PwES_percentage.toFixed(0)}%</strong> is ${getColorCodedRisk(step_four)}.
+                    <br>
+                    <br>
+                `;
+
+                document.getElementById('results').innerHTML = resultMessage;
+                }
+
+
+
+            });
+        });
+    </script>
+</body>
+</html>
